@@ -27,9 +27,10 @@ include_recipe "mysql::server"
 include_recipe "database"
 gem_package "mysql"
 
-database_name      = node['tt-rss']['database']['name']
-database_user      = node['tt-rss']['database']['user']
-database_passsword = node['tt-rss']['database']['password']
+database_name     = node['tt-rss']['database']['name']
+database_user     = node['tt-rss']['database']['user']
+database_password = node['tt-rss']['database']['password']
+database_host     = node['tt-rss']['database']['host']
 
 # Does the tt-rss database already exist? We need to know prior to creating
 # it in order to decide whether to run schema creation later, since schema
@@ -42,19 +43,19 @@ ruby_block "does tt-rss db exist" do
     require 'rubygems'
     Gem.clear_paths
     require 'mysql'
-    m = Mysql.new("localhost", "root", node['mysql']['server_root_password'])
+    m = Mysql.new(database_host, "root", node['mysql']['server_root_password'])
     node.run_state['tt_rss_db_exists'] = m.list_dbs.include?(database_name)
   end
 end
 
 mysql_database database_name do
-  connection ({:host => "localhost", :username => 'root', :password => node['mysql']['server_root_password']})
+  connection ({:host => database_host, :username => 'root', :password => node['mysql']['server_root_password']})
   action :create
 end
 
 mysql_database_user database_user do
-  connection ({:host => "localhost", :username => 'root', :password => node['mysql']['server_root_password']})
-  password database_passsword
+  connection ({:host => database_host, :username => 'root', :password => node['mysql']['server_root_password']})
+  password database_password
   database_name database_name
   host 'localhost'
   action [:create, :grant]
@@ -91,7 +92,8 @@ template "config.php" do
   variables(
       :db_user => database_user,
       :db_name => database_name,
-      :db_password => database_passsword,
+      :db_password => database_password,
+      :db_host => database_host,
       :url => node['tt-rss']['url']
   )
 
@@ -106,7 +108,7 @@ end
 
 # setup database schema
 mysql_database database_name do
-  connection ({:host => "localhost", :username => 'root', :password => node['mysql']['server_root_password']})
+  connection ({:host => database_host, :username => 'root', :password => node['mysql']['server_root_password']})
   sql { ::File.open("#{install_dir}/schema/ttrss_schema_mysql.sql").read }
   action :query
   not_if { node.run_state['tt_rss_db_exists'] }
